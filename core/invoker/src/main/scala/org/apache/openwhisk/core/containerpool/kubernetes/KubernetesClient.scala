@@ -170,6 +170,15 @@ class KubernetesClient(
       }
     }.recoverWith {
       case e =>
+        Future {
+          kubeRestClient
+            .inNamespace(kubeRestClient.getNamespace)
+            .pods()
+            .withName(name)
+            .delete()
+        }.recover {
+          case ex => log.error(this, s"Failed delete pod for '$name': ${ex.getClass} - ${ex.getMessage}")
+        }
         log.error(this, s"Failed create pod for '$name': ${e.getClass} - ${e.getMessage}")
         Future.failed(new Exception(s"Failed to create pod '$name'"))
     }
