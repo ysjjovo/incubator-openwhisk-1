@@ -158,26 +158,11 @@ class KubernetesClient(
           .waitUntilReady(config.timeouts.run.length, config.timeouts.run.unit)
         toContainer(createdPod)
       }
-    }.andThen {
-        case Failure(e) => log.error(this, s"Failed create pod for '$name': ${e.getClass} - ${e.getMessage}")
-      }
-      .recoverWith {
-        case _ =>
-          Future {
-            blocking {
-              kubeRestClient
-                .inNamespace(kubeRestClient.getNamespace)
-                .pods()
-                .withName(name)
-                .delete()
-            }
-          }.andThen {
-              case Failure(e) => log.error(this, s"Failed delete pod for '$name': ${e.getClass} - ${e.getMessage}")
-            }
-            .transformWith { _ =>
-              Future.failed(new Exception(s"Failed to create pod '$name'"))
-            }
-      }
+    }.recoverWith {
+      case e =>
+        log.error(this, s"Failed create pod for '$name': ${e.getClass} - ${e.getMessage}")
+        Future.failed(new Exception(s"Failed to create pod '$name'"))
+    }
   }
 
   def rm(container: KubernetesContainer)(implicit transid: TransactionId): Future[Unit] = {
@@ -187,6 +172,17 @@ class KubernetesClient(
           .inNamespace(kubeRestClient.getNamespace)
           .pods()
           .withName(container.id.asString)
+          .delete()
+      }
+    }.map(_ => ())
+  }
+  def rm(podName: String): Future[Unit] = {
+    Future {
+      blocking {
+        kubeRestClient
+          .inNamespace(kubeRestClient.getNamespace)
+          .pods()
+          .withName(podName)
           .delete()
       }
     }.map(_ => ())
@@ -254,6 +250,7 @@ object KubernetesClient {
 }
 
 trait KubernetesApi {
+
   def run(name: String,
           image: String,
           memory: ByteSize,
@@ -261,7 +258,7 @@ trait KubernetesApi {
           labels: Map[String, String] = Map.empty)(implicit transid: TransactionId): Future[KubernetesContainer]
 
   def rm(container: KubernetesContainer)(implicit transid: TransactionId): Future[Unit]
-
+  def rm(podName: String): Future[Unit]
   def rm(key: String, value: String, ensureUnpaused: Boolean)(implicit transid: TransactionId): Future[Unit]
 
   def suspend(container: KubernetesContainer)(implicit transid: TransactionId): Future[Unit]
