@@ -301,6 +301,7 @@ object KubernetesRestLogSourceStage {
         msg = line.substring(timestampDelimiter + 1)
         stream = "stdout" // TODO - when we can distinguish stderr: https://github.com/kubernetes/kubernetes/issues/28167
       } yield {
+        println(line)
         TypedLogLine(timestamp, stream, msg)
       }) match {
         case Some(logLine) =>
