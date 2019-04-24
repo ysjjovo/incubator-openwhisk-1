@@ -241,9 +241,13 @@ object KubernetesClient {
     .toFormatter()
     .withZone(ZoneId.of("UTC"))
 
-  def parseK8STimestamp(ts: String): Try[Instant] =
-    Try(Instant.from(K8STimestampFormat.parse(ts)))
-
+  def parseK8STimestamp(ts: String): Try[Instant] = {
+    val dotIdx = ts.indexOf('.')
+    val zIdx = ts.indexOf('Z')
+    Try(
+      Instant.from(K8STimestampFormat.parse(
+        if (zIdx - dotIdx < 10) ts.substring(0, zIdx) + List.fill(10 - zIdx + dotIdx)('0').mkString + 'Z' else ts)))
+  }
   def formatK8STimestamp(ts: Instant): Try[String] =
     Try(K8STimestampFormat.format(ts))
 }
